@@ -1,6 +1,12 @@
 # Spontime
 
-A Django 5 + DRF + PostGIS application with Celery/Redis for scheduled jobs (DBSCAN clustering + recommendations).
+A full-stack monorepo for a location-based social planning platform.
+
+## Architecture
+
+This is a monorepo containing:
+- **Backend**: Django 5 + DRF + PostGIS with Celery/Redis for scheduled jobs
+- **Frontend**: Modern web application for user interfaces (implementation TBD)
 
 ## Features
 
@@ -59,7 +65,7 @@ cd spontime_monorepo
 
 2. Copy environment variables:
 ```bash
-cp .env.example .env
+cp backend/.env.example backend/.env
 ```
 
 3. Build and start services:
@@ -69,19 +75,22 @@ docker-compose up --build
 
 4. Run migrations:
 ```bash
-docker-compose exec web python manage.py migrate
+docker-compose exec backend python manage.py migrate
 ```
 
 5. Create a superuser:
 ```bash
-docker-compose exec web python manage.py createsuperuser
+docker-compose exec backend python manage.py createsuperuser
 ```
 
 6. Access the application:
-- API: http://localhost:8000/api/
+- Backend API: http://localhost:8000/api/
 - Admin: http://localhost:8000/admin/
+- Frontend: http://localhost:3000/ (when implemented)
 
 ### Local Development (Without Docker)
+
+#### Backend
 
 1. Install PostgreSQL with PostGIS extension and Redis:
 ```bash
@@ -100,6 +109,7 @@ psql spontime -c "CREATE EXTENSION postgis;"
 
 3. Install Python dependencies:
 ```bash
+cd backend
 pip install -r requirements.txt
 ```
 
@@ -130,10 +140,18 @@ celery -A spontime worker -l info
 celery -A spontime beat -l info
 ```
 
+#### Frontend
+
+See [frontend/README.md](frontend/README.md) for frontend setup instructions.
+
 ## Running Tests
 
-### Using pytest
+### Backend Tests
+
+#### Using pytest
 ```bash
+cd backend
+
 # Run all tests
 pytest
 
@@ -144,8 +162,10 @@ pytest --cov=core --cov-report=html
 pytest core/tests/test_models.py
 ```
 
-### Using behave (BDD)
+#### Using behave (BDD)
 ```bash
+cd backend
+
 # Run all BDD tests
 behave
 
@@ -153,11 +173,15 @@ behave
 behave features/plans.feature
 ```
 
-### With Docker
+#### With Docker
 ```bash
-docker-compose exec web pytest
-docker-compose exec web behave
+docker-compose exec backend pytest
+docker-compose exec backend behave
 ```
+
+### Frontend Tests
+
+See [frontend/README.md](frontend/README.md) for frontend testing instructions.
 
 ## Scheduled Tasks
 
@@ -197,26 +221,43 @@ The hooks will automatically:
 
 ```
 spontime_monorepo/
-├── spontime/              # Django project settings
-│   ├── settings.py        # Main settings file
-│   ├── urls.py            # URL configuration
-│   └── celery.py          # Celery configuration
-├── core/                  # Main application
-│   ├── models.py          # Database models
-│   ├── serializers.py     # DRF serializers
-│   ├── views.py           # API views
-│   ├── tasks.py           # Celery tasks
-│   ├── admin.py           # Admin configuration
-│   └── urls.py            # App URL configuration
-├── features/              # BDD tests
-│   ├── plans.feature
-│   ├── recommendations.feature
-│   └── steps/             # Step definitions
-├── docker-compose.yml     # Docker services
-├── Dockerfile             # Docker image
-├── requirements.txt       # Python dependencies
-├── pytest.ini             # Pytest configuration
-└── .pre-commit-config.yaml  # Pre-commit hooks
+├── backend/                      # Backend Django application
+│   ├── spontime/                 # Django project settings
+│   │   ├── settings.py           # Main settings file
+│   │   ├── urls.py               # URL configuration
+│   │   └── celery.py             # Celery configuration
+│   ├── core/                     # Main application
+│   │   ├── models.py             # Database models
+│   │   ├── serializers.py        # DRF serializers
+│   │   ├── views.py              # API views
+│   │   ├── tasks.py              # Celery tasks
+│   │   ├── admin.py              # Admin configuration
+│   │   └── urls.py               # App URL configuration
+│   ├── features/                 # BDD tests
+│   │   ├── plans.feature
+│   │   ├── recommendations.feature
+│   │   └── steps/                # Step definitions
+│   ├── docker-compose.yml        # Backend Docker services
+│   ├── Dockerfile                # Backend Docker image
+│   ├── requirements.txt          # Python dependencies
+│   ├── pytest.ini                # Pytest configuration
+│   ├── API.md                    # API documentation
+│   └── .pre-commit-config.yaml   # Pre-commit hooks
+├── frontend/                     # Frontend application
+│   ├── src/                      # Source code
+│   ├── features/                 # BDD feature files
+│   │   ├── authentication.feature
+│   │   ├── plans.feature
+│   │   ├── recommendations.feature
+│   │   ├── places.feature
+│   │   ├── clusters.feature
+│   │   └── profile.feature
+│   ├── public/                   # Static assets
+│   ├── tests/                    # Frontend tests
+│   └── README.md                 # Frontend documentation
+├── docker-compose.yml            # Root Docker Compose (orchestrates both)
+├── README.md                     # This file
+└── LICENSE                       # MIT License
 ```
 
 ## API Examples

@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # Backend services
   db:
     image: postgis/postgis:15-3.3
     environment:
@@ -12,23 +11,17 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - spontime-network
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
-    networks:
-      - spontime-network
 
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+  web:
+    build: .
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
-      - ./backend:/app
+      - .:/app
     ports:
       - "8000:8000"
     depends_on:
@@ -37,58 +30,30 @@ services:
     environment:
       - DATABASE_URL=postgis://postgres:postgres@db:5432/spontime
       - REDIS_URL=redis://redis:6379/0
-    networks:
-      - spontime-network
 
   celery:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: .
     command: celery -A spontime worker -l info
     volumes:
-      - ./backend:/app
+      - .:/app
     depends_on:
       - db
       - redis
     environment:
       - DATABASE_URL=postgis://postgres:postgres@db:5432/spontime
       - REDIS_URL=redis://redis:6379/0
-    networks:
-      - spontime-network
 
   celery-beat:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    build: .
     command: celery -A spontime beat -l info
     volumes:
-      - ./backend:/app
+      - .:/app
     depends_on:
       - db
       - redis
     environment:
       - DATABASE_URL=postgis://postgres:postgres@db:5432/spontime
       - REDIS_URL=redis://redis:6379/0
-    networks:
-      - spontime-network
-
-  # Frontend service (placeholder for future implementation)
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   volumes:
-  #     - ./frontend:/app
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     - backend
-  #   networks:
-  #     - spontime-network
 
 volumes:
   postgres_data:
-
-networks:
-  spontime-network:
-    driver: bridge
