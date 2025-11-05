@@ -4,43 +4,51 @@ Celery tasks for the Spontime application.
 import numpy as np
 from celery import shared_task
 from django.contrib.gis.geos import Point
+from django.utils import timezone
 from sklearn.cluster import DBSCAN
-from .models import Place, Cluster, CheckIn, Recommendation, User
+from .models import Place, Venue, Cluster, CheckIn, RecoSnapshot, RecoItem, Plan, User
 
 
 @shared_task
 def update_clusters():
     """
-    Update place clusters using DBSCAN algorithm.
-    This task runs periodically to group nearby places.
+    Update place/venue clusters using DBSCAN algorithm.
+    This task runs periodically to group nearby locations.
     """
+    # Cluster places
     places = Place.objects.all()
+    if places.count() >= 2:
+        _cluster_entities(places, 'places')
     
-    if places.count() < 2:
-        return "Not enough places to cluster"
+    # Cluster venues
+    venues = Venue.objects.all()
+    if venues.count() >= 2:
+        _cluster_entities(venues, 'venues')
     
-    # Extract coordinates from places
+    return "Clustering completed"
+
+
+def _cluster_entities(queryset, scope):
+    """Helper function to cluster entities with location field."""
+    # Extract coordinates
     coordinates = []
-    place_ids = []
+    entity_ids = []
     
-    for place in places:
-        # Convert to lat/lon coordinates
-        lon = place.location.x
-        lat = place.location.y
+    for entity in queryset:
+        lon = entity.location.x
+        lat = entity.location.y
         coordinates.append([lat, lon])
-        place_ids.append(place.id)
+        entity_ids.append(entity.id)
     
     # Convert to numpy array
     X = np.array(coordinates)
     
     # Apply DBSCAN clustering
-    # eps is in degrees, roughly 0.01 degree = ~1km at equator
-    # min_samples is the minimum number of places to form a cluster
     db = DBSCAN(eps=0.01, min_samples=2).fit(X)
     labels = db.labels_
     
-    # Clear existing clusters
-    Cluster.objects.all().delete()
+    # Clear existing clusters for this scope
+    Cluster.objects.filter(scope=scope).delete()
     
     # Create new clusters
     unique_labels = set(labels)
@@ -50,9 +58,8 @@ def update_clusters():
         if label == -1:  # Noise points
             continue
         
-        # Get places in this cluster
+        # Get entities in this cluster
         cluster_mask = labels == label
-        cluster_place_ids = [place_ids[i] for i, mask in enumerate(cluster_mask) if mask]
         cluster_coords = X[cluster_mask]
         
         # Calculate centroid
@@ -60,23 +67,16 @@ def update_clusters():
         centroid_lon = float(np.mean(cluster_coords[:, 1]))
         centroid = Point(centroid_lon, centroid_lat, srid=4326)
         
-        # Calculate radius (max distance from centroid)
-        distances = np.sqrt(
-            (cluster_coords[:, 0] - centroid_lat) ** 2 +
-            (cluster_coords[:, 1] - centroid_lon) ** 2
-        )
-        radius = float(np.max(distances)) * 111000  # Convert degrees to meters
-        
         # Create cluster
         cluster = Cluster.objects.create(
-            cluster_id=int(label),
+            label=f"{scope.capitalize()} Cluster {label}",
             centroid=centroid,
-            radius=radius
+            scope=scope,
+            plan_count=0  # Will be updated separately
         )
-        cluster.places.set(cluster_place_ids)
         cluster_count += 1
     
-    return f"Created {cluster_count} clusters from {len(places)} places"
+    return cluster_count
 
 
 @shared_task
@@ -85,70 +85,85 @@ def generate_recommendations():
     Generate personalized recommendations for all users.
     This task runs periodically to update the recommendation feed.
     """
-    users = User.objects.all()
-    recommendation_count = 0
+    users = User.objects.filter(is_active=True)
+    snapshot_count = 0
     
     for user in users:
         # Get user's check-in history
-        user_checkins = CheckIn.objects.filter(user=user).select_related('place')
+        user_checkins = CheckIn.objects.filter(user=user).select_related('plan')
         
         if user_checkins.count() == 0:
             continue
         
-        # Get places the user has visited
-        visited_places = set(checkin.place_id for checkin in user_checkins)
+        # Get plans the user has participated in
+        participated_plan_ids = set(checkin.plan_id for checkin in user_checkins)
         
-        # Get categories the user likes (based on check-ins)
-        liked_categories = {}
-        for checkin in user_checkins:
-            category = checkin.place.category
-            if category:
-                liked_categories[category] = liked_categories.get(category, 0) + 1
+        # Get plans from user's attendances
+        from .models import Attendance
+        user_attendances = Attendance.objects.filter(user=user, status='joined')
+        attended_plan_ids = set(att.plan_id for att in user_attendances)
         
-        # Find clusters containing places the user has visited
-        user_clusters = Cluster.objects.filter(places__in=visited_places).distinct()
+        # Combine all plan IDs the user has been involved with
+        all_user_plan_ids = participated_plan_ids | attended_plan_ids
         
-        # Get recommended places from these clusters
-        recommended_places = Place.objects.filter(
-            clusters__in=user_clusters
+        # Get tags from plans user has attended
+        user_tags = set()
+        for plan in Plan.objects.filter(id__in=all_user_plan_ids):
+            if isinstance(plan.tags, list):
+                user_tags.update(plan.tags)
+        
+        # Find upcoming plans that the user hasn't joined
+        upcoming_plans = Plan.objects.filter(
+            is_active=True,
+            starts_at__gte=timezone.now()
         ).exclude(
-            id__in=visited_places
-        ).distinct()
+            id__in=all_user_plan_ids
+        ).select_related('host_user', 'place', 'venue')[:50]
         
-        # Score and create recommendations
-        for place in recommended_places[:10]:  # Limit to top 10
-            # Calculate score based on category match and cluster membership
+        if upcoming_plans.count() == 0:
+            continue
+        
+        # Create recommendation snapshot
+        snapshot = RecoSnapshot.objects.create(
+            user=user,
+            algo_version='v1.0',
+            explanations=[]
+        )
+        
+        # Score and create recommendation items
+        for plan in upcoming_plans[:20]:  # Limit to top 20
+            # Calculate score based on tag overlap
             score = 0.5  # Base score
             
-            # Boost score if category matches user preferences
-            if place.category in liked_categories:
-                score += 0.3 * (liked_categories[place.category] / user_checkins.count())
+            plan_tags = set(plan.tags) if isinstance(plan.tags, list) else set()
+            shared_tags = len(user_tags & plan_tags)
             
-            # Boost score based on cluster membership
-            common_clusters = place.clusters.filter(id__in=user_clusters).count()
-            if common_clusters > 0:
-                score += 0.2 * min(common_clusters / 3, 1.0)
+            if shared_tags > 0:
+                score += 0.3 * min(shared_tags / max(len(user_tags), 1), 1.0)
+            
+            # Calculate distance if user has a location from checkins
+            distance_m = 0
+            latest_checkin = user_checkins.order_by('-created_at').first()
+            if latest_checkin and latest_checkin.geo and (plan.place or plan.venue):
+                target_location = plan.place.location if plan.place else plan.venue.location
+                distance_m = int(latest_checkin.geo.distance(target_location) * 111000)  # degrees to meters
+                
+                # Boost score for nearby plans
+                if distance_m < 5000:  # Within 5km
+                    score += 0.2
             
             # Cap score at 1.0
             score = min(score, 1.0)
             
-            # Generate reason
-            reasons = []
-            if place.category in liked_categories:
-                reasons.append(f"You've visited {liked_categories[place.category]} {place.category} places")
-            if common_clusters > 0:
-                reasons.append(f"Near places you like")
-            reason = ". ".join(reasons) if reasons else "Similar to places you've visited"
-            
-            # Create or update recommendation
-            Recommendation.objects.update_or_create(
-                user=user,
-                place=place,
-                defaults={
-                    'score': score,
-                    'reason': reason,
-                }
+            # Create recommendation item
+            RecoItem.objects.create(
+                snapshot=snapshot,
+                plan=plan,
+                score=score,
+                distance_m=distance_m,
+                shared_tags=shared_tags
             )
-            recommendation_count += 1
+        
+        snapshot_count += 1
     
-    return f"Generated {recommendation_count} recommendations for {users.count()} users"
+    return f"Generated {snapshot_count} recommendation snapshots for {users.count()} users"

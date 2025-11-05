@@ -3,7 +3,10 @@ DRF serializers for the Spontime application.
 """
 from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
-from .models import User, Place, Plan, CheckIn, Cluster, Recommendation
+from .models import (
+    User, Device, InterestTag, Place, Partner, Venue, Cluster, Plan,
+    Attendance, JoinRequest, CheckIn, Message, Offer, RecoSnapshot, RecoItem
+)
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -11,91 +14,162 @@ class UserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'bio', 'created_at']
+        fields = ['id', 'handle', 'display_name', 'email', 'phone', 'photo_url', 'language', 'status', 'created_at']
         read_only_fields = ['id', 'created_at']
+        extra_kwargs = {'email': {'write_only': True}}
+
+
+class DeviceSerializer(serializers.ModelSerializer):
+    """Serializer for Device model."""
+    
+    class Meta:
+        model = Device
+        fields = ['id', 'user', 'platform', 'push_token', 'last_seen', 'trust_score']
+        read_only_fields = ['id', 'last_seen']
+
+
+class InterestTagSerializer(serializers.ModelSerializer):
+    """Serializer for InterestTag model."""
+    
+    class Meta:
+        model = InterestTag
+        fields = ['id', 'name', 'slug', 'type']
+        read_only_fields = ['id']
 
 
 class PlaceSerializer(GeoFeatureModelSerializer):
     """GeoJSON serializer for Place model."""
+    owner_user = UserSerializer(read_only=True)
     
     class Meta:
         model = Place
         geo_field = 'location'
-        fields = ['id', 'name', 'description', 'address', 'category', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'address', 'city', 'country', 'owner_user', 'tags', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class PartnerSerializer(serializers.ModelSerializer):
+    """Serializer for Partner model."""
+    owner_user = UserSerializer(read_only=True)
+    
+    class Meta:
+        model = Partner
+        fields = ['id', 'owner_user', 'legal_name', 'contact', 'status', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class VenueSerializer(GeoFeatureModelSerializer):
+    """GeoJSON serializer for Venue model."""
+    partner = PartnerSerializer(read_only=True)
+    partner_id = serializers.UUIDField(write_only=True)
+    
+    class Meta:
+        model = Venue
+        geo_field = 'location'
+        fields = ['id', 'partner', 'partner_id', 'name', 'address', 'contact', 'categories', 'status', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class ClusterSerializer(GeoFeatureModelSerializer):
+    """GeoJSON serializer for Cluster model."""
+    
+    class Meta:
+        model = Cluster
+        geo_field = 'centroid'
+        fields = ['id', 'label', 'scope', 'plan_count', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class AttendanceSerializer(serializers.ModelSerializer):
+    """Serializer for Attendance model."""
+    user = UserSerializer(read_only=True)
+    
+    class Meta:
+        model = Attendance
+        fields = ['id', 'plan', 'user', 'status', 'joined_at', 'left_at']
+        read_only_fields = ['id', 'joined_at']
 
 
 class PlanSerializer(serializers.ModelSerializer):
     """Serializer for Plan model."""
-    creator = UserSerializer(read_only=True)
+    host_user = UserSerializer(read_only=True)
+    venue = VenueSerializer(read_only=True)
     place = PlaceSerializer(read_only=True)
-    place_id = serializers.IntegerField(write_only=True)
-    participants = UserSerializer(many=True, read_only=True)
-    participant_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        write_only=True,
-        required=False
-    )
+    cluster = ClusterSerializer(read_only=True)
+    attendances = AttendanceSerializer(many=True, read_only=True)
+    
+    venue_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    place_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    cluster_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
     
     class Meta:
         model = Plan
         fields = [
-            'id', 'title', 'description', 'creator', 'place', 'place_id',
-            'participants', 'participant_ids', 'scheduled_time', 'status',
-            'created_at', 'updated_at'
+            'id', 'host_user', 'venue', 'venue_id', 'place', 'place_id', 'title', 'description',
+            'tags', 'starts_at', 'ends_at', 'capacity', 'visibility', 'is_active',
+            'cluster', 'cluster_id', 'rules', 'attendances', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'creator', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'host_user', 'created_at', 'updated_at']
 
-    def create(self, validated_data):
-        participant_ids = validated_data.pop('participant_ids', [])
-        plan = Plan.objects.create(**validated_data)
-        if participant_ids:
-            plan.participants.set(participant_ids)
-        return plan
 
-    def update(self, instance, validated_data):
-        participant_ids = validated_data.pop('participant_ids', None)
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-        if participant_ids is not None:
-            instance.participants.set(participant_ids)
-        return instance
+class JoinRequestSerializer(serializers.ModelSerializer):
+    """Serializer for JoinRequest model."""
+    user = UserSerializer(read_only=True)
+    
+    class Meta:
+        model = JoinRequest
+        fields = ['id', 'plan', 'user', 'status', 'created_at']
+        read_only_fields = ['id', 'user', 'created_at']
 
 
 class CheckInSerializer(serializers.ModelSerializer):
     """Serializer for CheckIn model."""
     user = UserSerializer(read_only=True)
-    place = PlaceSerializer(read_only=True)
-    place_id = serializers.IntegerField(write_only=True)
-    plan_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    plan = PlanSerializer(read_only=True)
+    plan_id = serializers.UUIDField(write_only=True)
     
     class Meta:
         model = CheckIn
-        fields = ['id', 'user', 'place', 'place_id', 'plan_id', 'timestamp', 'notes']
-        read_only_fields = ['id', 'user', 'timestamp']
+        fields = ['id', 'user', 'plan', 'plan_id', 'geo', 'created_at', 'flags']
+        read_only_fields = ['id', 'user', 'created_at']
 
 
-class ClusterSerializer(GeoFeatureModelSerializer):
-    """GeoJSON serializer for Cluster model."""
-    places = PlaceSerializer(many=True, read_only=True)
-    place_count = serializers.SerializerMethodField()
+class MessageSerializer(serializers.ModelSerializer):
+    """Serializer for Message model."""
+    user = UserSerializer(read_only=True)
     
     class Meta:
-        model = Cluster
-        geo_field = 'centroid'
-        fields = ['id', 'cluster_id', 'places', 'place_count', 'radius', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at']
-
-    def get_place_count(self, obj):
-        return obj.places.count()
+        model = Message
+        fields = ['id', 'plan', 'user', 'content', 'created_at']
+        read_only_fields = ['id', 'user', 'created_at']
 
 
-class RecommendationSerializer(serializers.ModelSerializer):
-    """Serializer for Recommendation model."""
-    place = PlaceSerializer(read_only=True)
+class OfferSerializer(serializers.ModelSerializer):
+    """Serializer for Offer model."""
+    venue = VenueSerializer(read_only=True)
+    venue_id = serializers.UUIDField(write_only=True)
     
     class Meta:
-        model = Recommendation
-        fields = ['id', 'place', 'score', 'reason', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        model = Offer
+        fields = ['id', 'venue', 'venue_id', 'title', 'description', 'valid_from', 'valid_to', 'tags', 'capacity']
+        read_only_fields = ['id']
+
+
+class RecoItemSerializer(serializers.ModelSerializer):
+    """Serializer for RecoItem model."""
+    plan = PlanSerializer(read_only=True)
+    
+    class Meta:
+        model = RecoItem
+        fields = ['id', 'plan', 'score', 'distance_m', 'shared_tags']
+        read_only_fields = ['id']
+
+
+class RecoSnapshotSerializer(serializers.ModelSerializer):
+    """Serializer for RecoSnapshot model."""
+    items = RecoItemSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = RecoSnapshot
+        fields = ['id', 'user', 'generated_at', 'algo_version', 'explanations', 'items']
+        read_only_fields = ['id', 'generated_at']
