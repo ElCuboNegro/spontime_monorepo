@@ -1,10 +1,14 @@
+# CI Pipeline - Constitution v1.3.0 Compliance
+# Enforces Pre-Merge Requirements (NON-NEGOTIABLE)
+# See: .specify/memory/constitution.md
+
 name: CI
 
 on:
   push:
-    branches: [ "main", "copilot/**" ]
+    branches: [ "main", "develop", "copilot/**" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
 
 jobs:
   test:
@@ -50,24 +54,41 @@ jobs:
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r backend/requirements.txt
     
     - name: Run migrations
       env:
-        DATABASE_URL: ******localhost:5432/spontime_test
+        DATABASE_URL: postgis://postgres:postgres@localhost:5432/spontime_test
         REDIS_URL: redis://localhost:6379/0
       run: |
+        cd backend
         python manage.py migrate
-    
-    - name: Run tests
+
+    # Constitution Pre-Merge Requirement: All unit tests MUST pass
+    - name: Run pytest (unit tests)
       env:
-        DATABASE_URL: ******localhost:5432/spontime_test
+        DATABASE_URL: postgis://postgres:postgres@localhost:5432/spontime_test
         REDIS_URL: redis://localhost:6379/0
       run: |
+        cd backend
         pytest --cov=core --cov-report=xml
+
+    # Constitution Pre-Merge Requirement: All BDD tests MUST pass
+    - name: Run behave (BDD tests)
+      env:
+        DATABASE_URL: postgis://postgres:postgres@localhost:5432/spontime_test
+        REDIS_URL: redis://localhost:6379/0
+      run: |
+        cd backend
+        behave
     
+    # Constitution Pre-Merge Requirement: Backend build MUST succeed
+    - name: Build backend Docker image
+      run: |
+        docker-compose build backend
+
     - name: Upload coverage
       uses: codecov/codecov-action@v4
       with:
-        file: ./coverage.xml
+        file: ./backend/coverage.xml
         fail_ci_if_error: false

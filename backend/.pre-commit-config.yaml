@@ -1,3 +1,8 @@
+# Pre-commit hooks configuration
+# Aligns with Spontime Constitution v1.3.0
+# Principle VI: Code Quality Gates (NON-NEGOTIABLE)
+# See: .specify/memory/constitution.md
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
@@ -27,3 +32,19 @@ repos:
     hooks:
       - id: flake8
         args: ['--max-line-length=88', '--extend-ignore=E203,W503']
+
+  # Constitution Principle VI: Code Quality Gates (NON-NEGOTIABLE)
+  # Run pytest tests before commit
+  - repo: local
+    hooks:
+      - id: pytest-check
+        name: pytest
+        entry: pytest --tb=short -q
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+
+      # Note: behave tests are excluded from pre-commit due to potential
+      # database setup requirements. They MUST be run before PR merge
+      # as per constitution Pre-Merge Requirements.
