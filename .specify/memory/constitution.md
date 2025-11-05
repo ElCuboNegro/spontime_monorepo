@@ -18,8 +18,9 @@ Templates Requiring Updates:
 Follow-up TODOs:
   - Ratification date to be confirmed by project team
   - Update frontend/ directory structure for React Native conventions
-  - Create 'develop' branch as integration branch
+  - Create 'develop' branch as integration branch ✅ DONE
   - Configure branch protection rules on GitHub for main and develop
+  - Setup CI/CD pipeline to enforce pre-merge requirements
 -->
 
 # Spontime Constitution
