@@ -1,13 +1,14 @@
 <!--
 Sync Impact Report
 ==================
-Version Change: 1.0.0 → 1.2.0
+Version Change: 1.0.0 → 1.3.0
 Modified Principles:
   - Principle VII (NEW): Business & UX Impact First - added to enforce feature value validation
 Added Sections:
   - Frontend Stack specification updated from "To be determined" to "React Native (MANDATORY)"
   - Mobile-specific requirements added to Frontend Stack
   - Branch Strategy expanded to full Gitflow workflow with protected branches
+  - Pre-Merge Requirements (NON-NEGOTIABLE) - mandatory test/build validation before PR merge
 Removed Sections: N/A
 Templates Requiring Updates:
   ✅ plan-template.md - Constitution Check section already references constitution
@@ -258,6 +259,35 @@ No feature SHALL be developed unless it has direct, measurable impact on busines
 - Breaking changes MUST include migration plan
 - Mobile UI changes SHOULD include screenshots for iOS and Android
 
+### Pre-Merge Requirements (NON-NEGOTIABLE)
+
+Before ANY pull request can be merged, the following MUST pass:
+
+**Backend Validation:**
+
+- All unit tests MUST pass: `cd backend && pytest`
+- All BDD tests MUST pass: `cd backend && behave`
+- Backend build MUST succeed: `docker-compose build backend`
+- No test failures or errors are acceptable
+
+**Mobile Validation (when applicable):**
+
+- Mobile unit tests MUST pass: `cd frontend && npm test`
+- TypeScript compilation MUST succeed: `cd frontend && npx tsc --noEmit`
+- Linting MUST pass: `cd frontend && npm run lint`
+
+**CI/CD Pipeline:**
+
+- All automated CI checks MUST be green
+- No bypassing of automated checks is permitted
+- Failed tests MUST be fixed before merge, not after
+
+**Exception Process:**
+
+- If tests are temporarily broken due to infrastructure issues (not code issues), document in PR
+- Requires explicit approval from at least two reviewers
+- Issue MUST be created to track test fix with immediate priority
+
 ## Governance
 
 ### Constitution Authority
@@ -294,4 +324,4 @@ Constitution amendments require:
 - Use `README.md` files for setup and operational guidance
 - Use feature specifications in `.specify/` for requirements truth
 
-**Version**: 1.2.0 | **Ratified**: TODO(RATIFICATION_DATE): Confirm with project team | **Last Amended**: 2025-01-05
+**Version**: 1.3.0 | **Ratified**: TODO(RATIFICATION_DATE): Confirm with project team | **Last Amended**: 2025-01-05
