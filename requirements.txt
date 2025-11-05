@@ -1,6 +1,6 @@
 # Django and DRF
 Django==5.1.13
-djangorestframework==3.14.0
+djangorestframework==3.15.2
 djangorestframework-gis==1.0
 
 # PostGIS
