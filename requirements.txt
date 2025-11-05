@@ -1,5 +1,5 @@
 # Django and DRF
-Django==5.1.13
+Django==5.1.14
 djangorestframework==3.14.0
 djangorestframework-gis==1.0
 
