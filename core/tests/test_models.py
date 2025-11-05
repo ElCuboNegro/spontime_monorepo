@@ -5,7 +5,7 @@ import pytest
 from django.contrib.gis.geos import Point
 from django.utils import timezone
 from datetime import timedelta
-from core.models import User, Place, Plan, CheckIn, Cluster, Recommendation
+from core.models import User, Place, Plan, CheckIn, Cluster, Attendance, Venue, Partner
 
 
 @pytest.mark.django_db
@@ -14,16 +14,16 @@ class TestUserModel:
     
     def test_user_creation(self):
         user = User.objects.create_user(
-            username='testuser',
+            handle='testuser',
             email='test@example.com',
             password='testpass123'
         )
-        assert user.username == 'testuser'
+        assert user.handle == 'testuser'
         assert user.email == 'test@example.com'
         assert user.check_password('testpass123')
     
     def test_user_str(self):
-        user = User.objects.create_user(username='testuser', password='test')
+        user = User.objects.create_user(handle='testuser', email='test@example.com', password='test')
         assert str(user) == 'testuser'
 
 
@@ -34,13 +34,13 @@ class TestPlaceModel:
     def test_place_creation(self):
         place = Place.objects.create(
             name='Test Place',
-            description='A test place',
             location=Point(-74.0060, 40.7128, srid=4326),
             address='123 Test St',
-            category='restaurant'
+            city='New York',
+            country='USA'
         )
         assert place.name == 'Test Place'
-        assert place.category == 'restaurant'
+        assert place.city == 'New York'
         assert place.location.x == -74.0060
         assert place.location.y == 40.7128
     
@@ -57,7 +57,7 @@ class TestPlanModel:
     """Test Plan model."""
     
     def test_plan_creation(self):
-        user = User.objects.create_user(username='testuser', password='test')
+        user = User.objects.create_user(handle='testuser', email='test@example.com', password='test')
         place = Place.objects.create(
             name='Test Place',
             location=Point(-74.0060, 40.7128, srid=4326)
@@ -65,18 +65,20 @@ class TestPlanModel:
         plan = Plan.objects.create(
             title='Test Plan',
             description='A test plan',
-            creator=user,
+            host_user=user,
             place=place,
-            scheduled_time=timezone.now() + timedelta(days=1),
-            status='active'
+            starts_at=timezone.now() + timedelta(days=1),
+            ends_at=timezone.now() + timedelta(days=1, hours=2),
+            visibility='public',
+            is_active=True
         )
         assert plan.title == 'Test Plan'
-        assert plan.creator == user
+        assert plan.host_user == user
         assert plan.place == place
-        assert plan.status == 'active'
+        assert plan.is_active is True
     
     def test_plan_str(self):
-        user = User.objects.create_user(username='testuser', password='test')
+        user = User.objects.create_user(handle='testuser', email='test@example.com', password='test')
         place = Place.objects.create(
             name='Test Place',
             location=Point(-74.0060, 40.7128, srid=4326)
@@ -84,11 +86,39 @@ class TestPlanModel:
         plan = Plan.objects.create(
             title='Test Plan',
             description='Test',
-            creator=user,
+            host_user=user,
             place=place,
-            scheduled_time=timezone.now()
+            starts_at=timezone.now(),
+            ends_at=timezone.now() + timedelta(hours=2)
         )
         assert str(plan) == 'Test Plan'
+
+
+@pytest.mark.django_db
+class TestAttendanceModel:
+    """Test Attendance model."""
+    
+    def test_attendance_creation(self):
+        user = User.objects.create_user(handle='testuser', email='test@example.com', password='test')
+        place = Place.objects.create(
+            name='Test Place',
+            location=Point(-74.0060, 40.7128, srid=4326)
+        )
+        plan = Plan.objects.create(
+            title='Test Plan',
+            host_user=user,
+            place=place,
+            starts_at=timezone.now(),
+            ends_at=timezone.now() + timedelta(hours=2)
+        )
+        attendance = Attendance.objects.create(
+            user=user,
+            plan=plan,
+            status='joined'
+        )
+        assert attendance.user == user
+        assert attendance.plan == plan
+        assert attendance.status == 'joined'
 
 
 @pytest.mark.django_db
@@ -96,28 +126,26 @@ class TestCheckInModel:
     """Test CheckIn model."""
     
     def test_checkin_creation(self):
-        user = User.objects.create_user(username='testuser', password='test')
+        user = User.objects.create_user(handle='testuser', email='test@example.com', password='test')
         place = Place.objects.create(
             name='Test Place',
             location=Point(-74.0060, 40.7128, srid=4326)
+        )
+        plan = Plan.objects.create(
+            title='Test Plan',
+            host_user=user,
+            place=place,
+            starts_at=timezone.now(),
+            ends_at=timezone.now() + timedelta(hours=2)
         )
         checkin = CheckIn.objects.create(
             user=user,
-            place=place,
-            notes='Great place!'
+            plan=plan,
+            geo=Point(-74.0060, 40.7128, srid=4326)
         )
         assert checkin.user == user
-        assert checkin.place == place
-        assert checkin.notes == 'Great place!'
-    
-    def test_checkin_str(self):
-        user = User.objects.create_user(username='testuser', password='test')
-        place = Place.objects.create(
-            name='Test Place',
-            location=Point(-74.0060, 40.7128, srid=4326)
-        )
-        checkin = CheckIn.objects.create(user=user, place=place)
-        assert str(checkin) == 'testuser @ Test Place'
+        assert checkin.plan == plan
+        assert checkin.geo is not None
 
 
 @pytest.mark.django_db
@@ -125,66 +153,56 @@ class TestClusterModel:
     """Test Cluster model."""
     
     def test_cluster_creation(self):
-        place1 = Place.objects.create(
-            name='Place 1',
-            location=Point(-74.0060, 40.7128, srid=4326)
-        )
-        place2 = Place.objects.create(
-            name='Place 2',
-            location=Point(-74.0070, 40.7130, srid=4326)
-        )
         cluster = Cluster.objects.create(
-            cluster_id=1,
+            label='Test Cluster',
             centroid=Point(-74.0065, 40.7129, srid=4326),
-            radius=100.0
+            scope='places',
+            plan_count=0
         )
-        cluster.places.add(place1, place2)
-        
-        assert cluster.cluster_id == 1
-        assert cluster.places.count() == 2
-        assert cluster.radius == 100.0
+        assert cluster.label == 'Test Cluster'
+        assert cluster.scope == 'places'
+        assert cluster.plan_count == 0
     
     def test_cluster_str(self):
         cluster = Cluster.objects.create(
-            cluster_id=42,
+            label='Test Cluster',
             centroid=Point(-74.0065, 40.7129, srid=4326),
-            radius=100.0
+            scope='plans'
         )
-        assert str(cluster) == 'Cluster 42'
+        assert 'Test Cluster' in str(cluster)
+        assert 'plans' in str(cluster)
 
 
 @pytest.mark.django_db
-class TestRecommendationModel:
-    """Test Recommendation model."""
+class TestVenueModel:
+    """Test Venue model."""
     
-    def test_recommendation_creation(self):
-        user = User.objects.create_user(username='testuser', password='test')
-        place = Place.objects.create(
-            name='Recommended Place',
+    def test_venue_creation(self):
+        user = User.objects.create_user(handle='testuser', email='test@example.com', password='test')
+        partner = Partner.objects.create(
+            owner_user=user,
+            legal_name='Test Partner LLC',
+            status='active'
+        )
+        venue = Venue.objects.create(
+            partner=partner,
+            name='Test Venue',
+            location=Point(-74.0060, 40.7128, srid=4326),
+            status='active'
+        )
+        assert venue.name == 'Test Venue'
+        assert venue.partner == partner
+        assert venue.status == 'active'
+    
+    def test_venue_str(self):
+        user = User.objects.create_user(handle='testuser', email='test@example.com', password='test')
+        partner = Partner.objects.create(
+            owner_user=user,
+            legal_name='Test Partner LLC'
+        )
+        venue = Venue.objects.create(
+            partner=partner,
+            name='Test Venue',
             location=Point(-74.0060, 40.7128, srid=4326)
         )
-        rec = Recommendation.objects.create(
-            user=user,
-            place=place,
-            score=0.85,
-            reason='Similar to places you like'
-        )
-        assert rec.user == user
-        assert rec.place == place
-        assert rec.score == 0.85
-        assert rec.reason == 'Similar to places you like'
-    
-    def test_recommendation_str(self):
-        user = User.objects.create_user(username='testuser', password='test')
-        place = Place.objects.create(
-            name='Test Place',
-            location=Point(-74.0060, 40.7128, srid=4326)
-        )
-        rec = Recommendation.objects.create(
-            user=user,
-            place=place,
-            score=0.75
-        )
-        assert 'Test Place' in str(rec)
-        assert 'testuser' in str(rec)
-        assert '0.75' in str(rec)
+        assert str(venue) == 'Test Venue'
