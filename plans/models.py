@@ -54,6 +54,11 @@ class Plan(models.Model):
     def is_member(self, user):
         """Check if user is a member of this plan."""
         return self.members.filter(id=user.id).exists() or self.creator == user
+    
+    @property
+    def member_count(self):
+        """Get total number of members including creator."""
+        return self.members.count() + 1  # +1 for creator
 
     def distance_to(self, lat, lon):
         """

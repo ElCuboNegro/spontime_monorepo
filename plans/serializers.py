@@ -47,7 +47,7 @@ class PlanSerializer(serializers.ModelSerializer):
     
     def get_member_count(self, obj):
         """Get total number of members including creator."""
-        return obj.members.count() + 1  # +1 for creator
+        return obj.member_count
     
     def get_is_joined(self, obj):
         """Check if current user is a member."""
@@ -81,4 +81,4 @@ class PlanListSerializer(serializers.ModelSerializer):
     
     def get_member_count(self, obj):
         """Get total number of members including creator."""
-        return obj.members.count() + 1
+        return obj.member_count
