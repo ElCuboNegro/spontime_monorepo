@@ -24,7 +24,7 @@ behave-django==1.4.0
 
 # Code Quality
 pre-commit==3.6.0
-black==24.1.1
+black==24.3.0
 flake8==7.0.0
 isort==5.13.2
 
