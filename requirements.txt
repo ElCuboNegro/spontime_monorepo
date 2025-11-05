@@ -1,0 +1,50 @@
+# Monorepo Quality Gates & Development Tools
+# Aligns with Spontime Constitution v1.3.0
+# Principle VI: Code Quality Gates (NON-NEGOTIABLE)
+# See: .specify/memory/constitution.md
+
+# Pre-commit hooks framework
+pre-commit>=3.6.0
+
+# Python code quality tools (for backend)
+black>=24.1.1
+isort>=5.13.2
+flake8>=7.0.0
+
+# Python testing tools (for backend validation)
+pytest>=7.4.3
+pytest-cov>=4.1.0
+pytest-django>=4.7.0
+
+# BDD testing (for backend)
+behave>=1.2.6
+behave-django>=1.4.0
+
+# Type checking
+mypy>=1.8.0
+
+# Security scanning
+bandit>=1.7.6
+safety>=3.0.0
+
+# Documentation tools
+mkdocs>=1.5.3
+mkdocs-material>=9.5.3
+
+# Git hooks and commit message validation
+commitizen>=3.13.0
+
+# YAML/JSON validation
+yamllint>=1.33.0
+jsonschema>=4.20.0
+
+# Development utilities
+ipython>=8.20.0
+ipdb>=0.13.13
+
+# Code complexity analysis
+radon>=6.0.1
+mccabe>=0.7.0
+
+# Requirements management
+pip-tools>=7.3.0
