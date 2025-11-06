@@ -2,13 +2,17 @@
 
 A Django 5 + DRF + PostGIS application with Celery/Redis for scheduled jobs (DBSCAN clustering + recommendations).
 
+**New**: Token-based authentication and Android demo app included!
+
 ## Features
 
 - **Django 5** with Django REST Framework (DRF)
+- **Token Authentication** with user registration and login
 - **PostGIS** for geospatial data and queries
 - **Celery + Redis** for scheduled background tasks
 - **DBSCAN clustering** using scikit-learn for place grouping
 - **Personalized recommendations** based on user check-in history
+- **Android Demo App** showcasing authentication and API usage
 - **Docker Compose** for easy development and deployment
 - **pytest + behave** for testing (unit tests + BDD)
 - **pre-commit hooks** for code quality
@@ -24,16 +28,22 @@ A Django 5 + DRF + PostGIS application with Celery/Redis for scheduled jobs (DBS
 
 ## API Endpoints
 
+### Authentication
+- `POST /api/auth/register/` - Register a new user
+- `POST /api/auth/login/` - Login and get authentication token
+- `POST /api/auth/logout/` - Logout (invalidate token)
+- `GET /api/auth/profile/` - Get current user profile
+
 ### Plans
 - `GET /api/plans/` - List all plans
-- `POST /api/plans/` - Create a new plan
+- `POST /api/plans/` - Create a new plan (authenticated)
 - `GET /api/plans/{id}/` - Get plan details
 - `PUT /api/plans/{id}/` - Update a plan
 - `DELETE /api/plans/{id}/` - Delete a plan
 - `GET /api/plans/nearby/?lat={lat}&lon={lon}&radius={meters}` - Search nearby plans
 
 ### Recommendations
-- `GET /api/recs/feed/` - Get personalized recommendation feed for authenticated user
+- `GET /api/recs/feed/` - Get personalized recommendation feed (authenticated)
 - `GET /api/recs/` - List all recommendations
 
 ### Other Endpoints
@@ -41,6 +51,8 @@ A Django 5 + DRF + PostGIS application with Celery/Redis for scheduled jobs (DBS
 - `GET /api/places/` - List places
 - `GET /api/checkins/` - List check-ins
 - `GET /api/clusters/` - List clusters
+
+**Full API documentation**: See [API_ENDPOINTS.md](./API_ENDPOINTS.md) and [AUTHENTICATION.md](./AUTHENTICATION.md)
 
 ## Quick Start
 
@@ -67,12 +79,12 @@ cp .env.example .env
 docker-compose up --build
 ```
 
-4. Run migrations:
+4. Run migrations (includes auth token tables):
 ```bash
 docker-compose exec web python manage.py migrate
 ```
 
-5. Create a superuser:
+5. Create a superuser (optional):
 ```bash
 docker-compose exec web python manage.py createsuperuser
 ```
@@ -80,6 +92,10 @@ docker-compose exec web python manage.py createsuperuser
 6. Access the application:
 - API: http://localhost:8000/api/
 - Admin: http://localhost:8000/admin/
+- Auth endpoints: http://localhost:8000/api/auth/
+
+7. (Optional) Run the Android demo app:
+   - See [android_demo/README.md](./android_demo/README.md) for setup instructions
 
 ### Local Development (Without Docker)
 
@@ -205,13 +221,19 @@ spontime_monorepo/
 │   ├── models.py          # Database models
 │   ├── serializers.py     # DRF serializers
 │   ├── views.py           # API views
+│   ├── auth_views.py      # Authentication endpoints
 │   ├── tasks.py           # Celery tasks
 │   ├── admin.py           # Admin configuration
 │   └── urls.py            # App URL configuration
+├── android_demo/          # Android demo application
+│   ├── app/               # Android app source
+│   └── README.md          # Android setup guide
 ├── features/              # BDD tests
 │   ├── plans.feature
 │   ├── recommendations.feature
 │   └── steps/             # Step definitions
+├── API_ENDPOINTS.md       # Complete API documentation
+├── AUTHENTICATION.md      # Authentication guide
 ├── docker-compose.yml     # Docker services
 ├── Dockerfile             # Docker image
 ├── requirements.txt       # Python dependencies
@@ -221,10 +243,32 @@ spontime_monorepo/
 
 ## API Examples
 
+### Register a New User
+```bash
+curl -X POST http://localhost:8000/api/auth/register/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "handle": "myusername",
+    "password": "securepass123"
+  }'
+```
+
+### Login
+```bash
+curl -X POST http://localhost:8000/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepass123"
+  }'
+```
+
 ### Create a Place
 ```bash
 curl -X POST http://localhost:8000/api/places/ \
   -H "Content-Type: application/json" \
+  -H "Authorization: Token <your-token>" \
   -d '{
     "type": "Feature",
     "properties": {
@@ -263,6 +307,8 @@ curl "http://localhost:8000/api/plans/nearby/?lat=40.7128&lon=-74.0060&radius=50
 curl http://localhost:8000/api/recs/feed/ \
   -H "Authorization: Token <your-token>"
 ```
+
+For more examples, see [AUTHENTICATION.md](./AUTHENTICATION.md).
 
 ## Contributing
 

@@ -8,6 +8,7 @@ from .views import (
     AttendanceViewSet, JoinRequestViewSet, CheckInViewSet,
     MessageViewSet, ClusterViewSet, OfferViewSet, RecoSnapshotViewSet
 )
+from .auth_views import register, login, logout, profile
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet)
@@ -23,5 +24,9 @@ router.register(r'offers', OfferViewSet)
 router.register(r'recs', RecoSnapshotViewSet, basename='recommendation')
 
 urlpatterns = [
+    path('auth/register/', register, name='auth-register'),
+    path('auth/login/', login, name='auth-login'),
+    path('auth/logout/', logout, name='auth-logout'),
+    path('auth/profile/', profile, name='auth-profile'),
     path('', include(router.urls)),
 ]
