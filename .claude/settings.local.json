@@ -1,9 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir:*)",
-      "Bash(tree:*)",
-      "Bash(git *)"
+      "Bash(git commit -m \"$(cat <<''EOF''\nchore: align pre-commit hooks and CI with constitution v1.3.0\n\nUpdate quality gates to enforce constitution requirements\n\nChanges:\n- Add root-level .pre-commit-config.yaml for monorepo\n  - Runs Black, isort, flake8 on backend/ files\n  - Runs pytest on backend Python changes\n  - Prepared for frontend ESLint/Prettier (commented out)\n\n- Update backend/.pre-commit-config.yaml\n  - Add constitution reference header\n  - Add pytest hook for early test validation\n  - Document behave exclusion (requires DB setup)\n\n- Update .github/workflows/ci.yml to enforce Pre-Merge Requirements\n  - Add ''develop'' branch to CI triggers\n  - Run pytest (unit tests) - REQUIRED\n  - Run behave (BDD tests) - REQUIRED\n  - Build Docker backend image - REQUIRED\n  - Fix paths for monorepo structure (backend/)\n  - Add constitution compliance comments\n\nAligns with:\n- Principle VI: Code Quality Gates (NON-NEGOTIABLE)\n- Pre-Merge Requirements (NON-NEGOTIABLE)\n  - All unit tests MUST pass\n  - All BDD tests MUST pass\n  - Backend build MUST succeed\n\nSee: .specify/memory/constitution.md\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "SlashCommand(/speckit.specify)",
+      "Bash(git fetch:*)",
+      "Bash(pwsh:*)"
     ],
     "deny": [],
     "ask": []
