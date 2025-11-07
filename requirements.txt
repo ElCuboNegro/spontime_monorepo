@@ -2,6 +2,11 @@
 # Aligns with Spontime Constitution v1.3.0
 # Principle VI: Code Quality Gates (NON-NEGOTIABLE)
 # See: .specify/memory/constitution.md
+=======
+# Django and DRF
+Django==5.1.14
+djangorestframework==3.14.0
+djangorestframework-gis==1.0
 
 # Pre-commit hooks framework
 pre-commit>=3.6.0
